@@ -7,63 +7,70 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.experimental.runners.Enclosed
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.IOException
 
-@RunWith(RobolectricTestRunner::class)
+@RunWith(Enclosed::class)
 class GitRepositoryLocalDataSourceTest {
-    lateinit var gitRepositoryLocalDataSource: GitRepositoryLocalDataSource
-//    lateinit var db: AppDatabase
+    abstract class DBTest {
+        //    lateinit var db: AppDatabase
+        lateinit var gitRepositoryLocalDataSource: GitRepositoryLocalDataSource
 
-    @Before
-    fun setUp() {
-        val context = InstrumentationRegistry.getInstrumentation().context
-        val db = Room
-            .inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
-        gitRepositoryLocalDataSource = GitRepositoryLocalDataSource(db)
-    }
+        @Before
+        fun setUp() {
+            val context = InstrumentationRegistry.getInstrumentation().context
+            val db = Room
+                .inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
+            gitRepositoryLocalDataSource = GitRepositoryLocalDataSource(db)
+        }
 
-    @After
-    @Throws(IOException::class)
-    fun tearDown() {
+        @After
+        @Throws(IOException::class)
+        fun tearDown() {
 //        db.clearAllTables()
 //        db.close()
+        }
     }
 
-    @Test
-    fun insertAll_finishesSuccessfully() {
-        var list = gitRepositoryLocalDataSource.findByOwner("hoge")
-        Assertions.assertThat(list).isEmpty()
-
-        val owner = "hoge"
-        gitRepositoryLocalDataSource.insertAll(
-            GitRepository(1, "hello","hello", owner),
-            GitRepository(2, "world", "world", owner)
-        )
-        list = gitRepositoryLocalDataSource.findByOwner("hoge")
-        Assertions.assertThat(list).hasSize(2)
+    @RunWith(RobolectricTestRunner::class)
+    class BlankRecord : DBTest() {
+        @Test
+        fun insertAll_successfully_parent_record() {
+            var hoge = "hoge"
+            gitRepositoryLocalDataSource.insertAll(
+                GitRepository(0, "hello","hello", hoge)
+            )
+            var hogeOwners = gitRepositoryLocalDataSource.findByOwner(hoge)
+            assertThat(hogeOwners).hasSize(1)
+        }
     }
 
-    @Test
-    fun findByOwner_insertedListCheck() {
-        var list = gitRepositoryLocalDataSource.findByOwner("hoge")
-        Assertions.assertThat(list).isEmpty()
+    @RunWith(RobolectricTestRunner::class)
+    class RecordPrepared : DBTest() {
+        @Before
+        fun setUpChild() {
+            val owner = "hoge"
+            gitRepositoryLocalDataSource.insertAll(
+                GitRepository(1, "hello","hello", owner),
+                GitRepository(2, "world", "world", owner),
+                GitRepository(3, "yay!", "yay!", "suzuki")
+            )
+        }
 
-        val owner = "hoge"
-        gitRepositoryLocalDataSource.insertAll(
-            GitRepository(1, "hello","hello", owner),
-            GitRepository(2, "world", "world", owner)
-        )
-        list = gitRepositoryLocalDataSource.findByOwner("hoge")
-        Assertions.assertThat(list).hasSize(2)
-    }
+        @Test
+        fun findByOwner_givenHoge_returnssizeCount2() {
+            var list = gitRepositoryLocalDataSource.findByOwner("hoge")
+            Assertions.assertThat(list).hasSize(2)
+        }
 
-    @Test
-    fun findByOwner_expectsEmpty() {
-        val list = gitRepositoryLocalDataSource.findByOwner("hoge")
-        assertThat(list).isEmpty()
+        @Test
+        fun findByOwner_givenSuzuki_returnssizeCount1() {
+            var list = gitRepositoryLocalDataSource.findByOwner("suzuki")
+            Assertions.assertThat(list).hasSize(1)
+        }
     }
 }
